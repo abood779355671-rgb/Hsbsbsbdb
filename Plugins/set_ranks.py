@@ -382,3 +382,208 @@ async def set_ranks_handler(c: Client, m: Message):
 
         rank_cache_invalidate(target_id, cid)
         return await m.reply(f"「 {mention} 」\n{k} نزلته من {target_rank}\n☆")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── الميزة 2: قوائم الأعضاء التفصيلية ─────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+async def _build_rank_list(c: Client, cid: int, redis_key: str, title: str, k: str) -> str:
+    """
+    يبني قائمة منسقة لرتبة معينة.
+    يجلب الأعضاء من Redis ويحاول جلب اسم كل عضو من Telegram.
+    """
+    members = await ar.smembers(redis_key)
+    if not members:
+        return f"{k} **{title}**\n\nلا يوجد أعضاء في هذه القائمة"
+
+    lines = [f"{k} **{title}** ({len(members)})\n"]
+    for i, uid_str in enumerate(members, 1):
+        try:
+            u = await c.get_users(int(uid_str))
+            name = u.mention
+        except Exception:
+            name = f"`{uid_str}`"
+        lines.append(f"{i}. {name}")
+
+    return "\n".join(lines)
+
+
+@Client.on_message(filters.text & filters.group, group=6)
+async def rank_lists_handler(c: Client, m: Message):
+    if not m.from_user:
+        return
+    cid = m.chat.id
+    uid = m.from_user.id
+
+    if not group_enabled(cid):
+        return
+    if not can_speak(uid, cid):
+        return
+
+    text = resolve_text(m.text, cid)
+    k    = botkey()
+
+    # ── المدراء ──────────────────────────────────────────────────────────
+    if text == "المدراء":
+        if not is_admin(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص الادمن وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"{cid}:rankMODs:{DEV_ID}",
+            "المدراء 🛡", k
+        )
+        return await m.reply(msg)
+
+    # ── المالكين ─────────────────────────────────────────────────────────
+    if text == "المالكين":
+        if not is_admin(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص الادمن وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"{cid}:rankOWNERs:{DEV_ID}",
+            "المالكين 👑", k
+        )
+        return await m.reply(msg)
+
+    # ── الادمنيه ─────────────────────────────────────────────────────────
+    if text == "الادمنيه":
+        if not is_admin(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص الادمن وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"{cid}:rankADMINs:{DEV_ID}",
+            "الادمنيه ⭐", k
+        )
+        return await m.reply(msg)
+
+    # ── المميزين ─────────────────────────────────────────────────────────
+    if text == "المميزين":
+        msg = await _build_rank_list(
+            c, cid,
+            f"{cid}:rankPREs:{DEV_ID}",
+            "المميزين ✨", k
+        )
+        return await m.reply(msg)
+
+    # ── المقيدين (المكتومين في المجموعة) ────────────────────────────────
+    if text == "المقيدين":
+        if not is_admin(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص الادمن وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"{cid}:listMUTEs:{DEV_ID}",
+            "المقيدين 🔇", k
+        )
+        return await m.reply(msg)
+
+    # ── المكتومين عاماً ───────────────────────────────────────────────────
+    if text == "المكتومين":
+        if not is_mod(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص المدير وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"listMUTE:{DEV_ID}",
+            "المكتومين عاماً 🔇", k
+        )
+        return await m.reply(msg)
+
+    # ── المطرودين (المحظورين عاماً) ─────────────────────────────────────
+    if text == "المطرودين":
+        if not is_mod(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص المدير وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"listGBAN:{DEV_ID}",
+            "المطرودين (حظر عام) 🔴", k
+        )
+        return await m.reply(msg)
+
+    # ── المحظورين (محظوري الألعاب) ──────────────────────────────────────
+    if text == "المحظورين":
+        if not is_mod(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص المدير وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"listGBANGAMES:{DEV_ID}",
+            "المحظورين من الألعاب 🎮", k
+        )
+        return await m.reply(msg)
+
+    # ── المنشئين الاساسيين ───────────────────────────────────────────────
+    if text == "المنشئين الاساسيين":
+        if not is_mod(uid, cid):
+            return await m.reply(f"{k} هذا الأمر يخص المدير وفوق فقط")
+        msg = await _build_rank_list(
+            c, cid,
+            f"{cid}:rankGOWNERs:{DEV_ID}",
+            "المنشئين الاساسيين 🌟", k
+        )
+        return await m.reply(msg)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── الميزة 3: قوائم الثانويين والمطورين ────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+@Client.on_message(filters.text & filters.private, group=6)
+async def dev_lists_handler(c: Client, m: Message):
+    """
+    أوامر قوائم Dev² و Myth و المنشئين — تعمل في الخاص فقط
+    لأنها بيانات عامة (غير مرتبطة بمجموعة معينة).
+    """
+    if not m.from_user:
+        return
+    uid = m.from_user.id
+
+    text = m.text.strip() if m.text else ""
+    k    = botkey()
+
+    # ── الثانويين (Dev²) ─────────────────────────────────────────────────
+    if text == "الثانويين":
+        if not is_dev(uid, 0):
+            return await m.reply(f"{k} هذا الأمر يخص المطورين فقط")
+        members = await ar.smembers(f"{DEV_ID}:DEV2")
+        if not members:
+            return await m.reply(f"{k} **الثانويين Dev²🎖**\n\nلا يوجد ثانويين حالياً")
+        lines = [f"{k} **الثانويين Dev²🎖** ({len(members)})\n"]
+        for i, uid_str in enumerate(members, 1):
+            try:
+                u = await c.get_users(int(uid_str))
+                name = u.mention
+            except Exception:
+                name = f"`{uid_str}`"
+            lines.append(f"{i}. {name}")
+        return await m.reply("\n".join(lines))
+
+    # ── المطورين (Myth) ───────────────────────────────────────────────────
+    if text == "المطورين":
+        if not is_dev(uid, 0):
+            return await m.reply(f"{k} هذا الأمر يخص المطورين فقط")
+        members = await ar.smembers(f"{DEV_ID}:DEV")
+        if not members:
+            return await m.reply(f"{k} **المطورين Myth🎖️**\n\nلا يوجد مطورين حالياً")
+        lines = [f"{k} **المطورين Myth🎖️** ({len(members)})\n"]
+        for i, uid_str in enumerate(members, 1):
+            try:
+                u = await c.get_users(int(uid_str))
+                name = u.mention
+            except Exception:
+                name = f"`{uid_str}`"
+            lines.append(f"{i}. {name}")
+        return await m.reply("\n".join(lines))
+
+    # ── المنشئين (Botowner) ───────────────────────────────────────────────
+    if text == "المنشئين":
+        if not is_dev(uid, 0):
+            return await m.reply(f"{k} هذا الأمر يخص المطورين فقط")
+        owner_id = await ar.get(f"{DEV_ID}:owner")
+        if not owner_id:
+            return await m.reply(f"{k} **المنشئين**\n\nلم يتم تعيين منشئ بعد")
+        try:
+            u = await c.get_users(int(owner_id))
+            name = u.mention
+        except Exception:
+            name = f"`{owner_id}`"
+        return await m.reply(f"{k} **المنشئ (Botowner)**\n\n1. {name}")
+
